@@ -1,17 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="styles.css">
-  <title>Vanilla JavaScript App</title>
+  <title>TFJS Pose Detection</title>
+  <style>
+    video, canvas { display: block; }
+  </style>
 </head>
-
 <body>
-  <main>
-    <h1>Vanilla JavaScript App</h1>
-  </main>
-</body>
+  <video id="webcam" width="640" height="480" autoplay></video>
+  <button id="download">Download Keypoints JSON</button>
 
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/movenet"></script>
+  <script>
+    const video = document.getElementById('webcam');
+    const downloadButton = document.getElementById('download');
+    let keypointsData = [];
+
+    async function setupWebcam() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      video.srcObject = stream;
+
+      return new Promise((resolve) => {
+        video.onloadedmetadata = () => resolve(video);
+      });
+    }
+
+    async function loadModel() {
+      const model = await tf.models.movenet.load();
+      return model;
+    }
+
+    async function detectPose(model) {
+      const poses = await model.estimatePoses(video);
+      if (poses.length > 0) {
+        keypointsData.push(poses[0].keypoints);
+      }
+
+      // Continue detecting poses
+      setTimeout(() => detectPose(model), 100);
+    }
+
+    async function main() {
+      await setupWebcam();
+      const model = await loadModel();
+      detectPose(model);
+    }
+
+    function downloadKeypointsJSON() {
+      const jsonData = JSON.stringify(keypointsData);
+      const blob = new Blob([jsonData], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'keypoints.json';
+      link.click();
+
+      URL.revokeObjectURL(url);
+    }
+
+    main();
+
+    downloadButton.addEventListener('click', downloadKeypointsJSON);
+  </script>
+</body>
 </html>
